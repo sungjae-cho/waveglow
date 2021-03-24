@@ -142,11 +142,15 @@ def apply_gradient_allreduce(module):
     return module
 
 
-def main(config, stdout_dir, args_str):
+def main(config, stdout_dir, args_str, args):
     args_list = ['train.py']
     args_list += args_str.split(' ') if len(args_str) > 0 else []
 
     args_list.append('--config={}'.format(config))
+    args_list.append('--prj_name={}'.format(args.prj_name))
+    args_list.append('--run_name={}'.format(args.run_name))
+    args_list.append('--visible_gpus={}'.format(args.visible_gpus))
+    args_list.append('--resume={}'.format(args.resume))
 
     num_gpus = torch.cuda.device_count()
     args_list.append('--num_gpus={}'.format(num_gpus))
@@ -172,6 +176,14 @@ def main(config, stdout_dir, args_str):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('--prj_name', type=str,
+                        help='give a project name for this running')
+    parser.add_argument('--run_name', type=str,
+                        help='give a distinct name for this running')
+    parser.add_argument('--visible_gpus', type=str, default="0",
+                        required=False, help='CUDA visible GPUs')
+    parser.add_argument('--resume', type=str, default="",
+                        required=False, help='whether to resume wandb logging')
     parser.add_argument('-c', '--config', type=str, required=True,
                         help='JSON file for configuration')
     parser.add_argument('-s', '--stdout_dir', type=str, default=".",
@@ -181,4 +193,5 @@ if __name__ == '__main__':
         help='double quoted string with space separated key value pairs')
 
     args = parser.parse_args()
-    main(args.config, args.stdout_dir, args.args_str)
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.visible_gpus
+    main(args.config, args.stdout_dir, args.args_str, args)

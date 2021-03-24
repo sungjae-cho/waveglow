@@ -28,6 +28,7 @@ import argparse
 import json
 import os
 import torch
+import wandb
 
 #=====START: ADDED FOR DISTRIBUTED======
 from distributed import init_distributed, apply_gradient_allreduce, reduce_tensor
@@ -59,9 +60,14 @@ def save_checkpoint(model, optimizer, learning_rate, iteration, filepath):
                 'optimizer': optimizer.state_dict(),
                 'learning_rate': learning_rate}, filepath)
 
-def train(num_gpus, rank, group_name, output_directory, epochs, learning_rate,
+def create_dir(dir_path):
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+
+def train(num_gpus, rank, group_name, prj_name, run_name,
+          output_directory, epochs, learning_rate,
           sigma, iters_per_checkpoint, batch_size, seed, fp16_run,
-          checkpoint_path, with_tensorboard):
+          checkpoint_path, with_tensorboard, with_wandb):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     #=====START: ADDED FOR DISTRIBUTED======
@@ -142,10 +148,22 @@ def train(num_gpus, rank, group_name, output_directory, epochs, learning_rate,
             if with_tensorboard and rank == 0:
                 logger.add_scalar('training_loss', reduced_loss, i + len(train_loader) * epoch)
 
+
+            if with_wandb and rank == 0:
+                wandb.log({
+                    'iteration': iteration,
+                    'training_loss': reduced_loss,
+                }, step=iteration)
+
             if (iteration % iters_per_checkpoint == 0):
                 if rank == 0:
-                    checkpoint_path = "{}/waveglow_{}".format(
-                        output_directory, iteration)
+                    create_dir('{}'.format(output_directory))
+                    create_dir('{}/{}'.format(output_directory, prj_name))
+                    create_dir('{}/{}/{}'.format(output_directory, prj_name, run_name))
+                    checkpoint_path = "{}/{}/{}/waveglow_{}".format(
+                        output_directory,
+                        prj_name, run_name,
+                        iteration)
                     save_checkpoint(model, optimizer, learning_rate, iteration,
                                     checkpoint_path)
 
@@ -153,12 +171,20 @@ def train(num_gpus, rank, group_name, output_directory, epochs, learning_rate,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument('--prj_name', type=str,
+                        help='give a project name for this running')
+    parser.add_argument('--run_name', type=str,
+                        help='give a distinct name for this running')
     parser.add_argument('-c', '--config', type=str,
                         help='JSON file for configuration')
     parser.add_argument('-r', '--rank', type=int, default=0,
                         help='rank of process for distributed')
     parser.add_argument('-g', '--group_name', type=str, default='',
                         help='name of group for distributed')
+    parser.add_argument('--visible_gpus', type=str, default="0",
+                        required=False, help='CUDA visible GPUs')
+    parser.add_argument('--resume', type=str, default="",
+                        required=False, help='whether to resume wandb logging')
     args = parser.parse_args()
 
     # Parse configs.  Globals nicer in this case
@@ -173,6 +199,8 @@ if __name__ == "__main__":
     global waveglow_config
     waveglow_config = config["waveglow_config"]
 
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.visible_gpus
+
     num_gpus = torch.cuda.device_count()
     if num_gpus > 1:
         if args.group_name == '':
@@ -183,6 +211,13 @@ if __name__ == "__main__":
     if num_gpus == 1 and args.rank != 0:
         raise Exception("Doing single GPU training on rank > 0")
 
+    if args.rank == 0 and train_config["with_wandb"]:
+        if args.resume == "":
+            wandb.init(name=args.run_name, project=args.prj_name, resume=args.resume)
+        else:
+            wandb.init(project=args.prj_name, resume=args.resume)
+
     torch.backends.cudnn.enabled = True
     torch.backends.cudnn.benchmark = False
-    train(num_gpus, args.rank, args.group_name, **train_config)
+    train(num_gpus, args.rank, args.group_name,
+        args.prj_name, args.run_name, **train_config)
