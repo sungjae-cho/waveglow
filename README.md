@@ -12,7 +12,7 @@ using only a single network, trained using only a single cost function:
 maximizing the likelihood of the training data, which makes the training
 procedure simple and stable.
 
-Our [PyTorch] implementation produces audio samples at a rate of 1200 
+Our [PyTorch] implementation produces audio samples at a rate of 1200
 kHz on an NVIDIA V100 GPU. Mean Opinion Scores show that it delivers audio
 quality as good as the best publicly available WaveNet implementation.
 
@@ -57,11 +57,14 @@ with fused residual and skip connections.
 3. Train your WaveGlow networks
 
    ```command
-   mkdir checkpoints
-   python train.py -c config.json
+   python train.py -c config.json --prj_name waveglow_ko --run_name test --visible_gpus 1
    ```
 
    For multi-GPU training replace `train.py` with `distributed.py`.  Only tested with single node and NCCL.
+
+   ```command
+   python distributed.py -c config.json --prj_name prj_name --run_name run_name --visible_gpus 1,2,3
+   ```
 
    For mixed precision training set `"fp16_run": true` on `config.json`.
 
