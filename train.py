@@ -36,6 +36,7 @@ from torch.utils.data.distributed import DistributedSampler
 #=====END:   ADDED FOR DISTRIBUTED======
 
 from torch.utils.data import DataLoader
+from shutil import copyfile
 from glow import WaveGlow, WaveGlowLoss
 from mel2samp import Mel2Samp
 
@@ -157,9 +158,6 @@ def train(num_gpus, rank, group_name, prj_name, run_name,
 
             if (iteration % iters_per_checkpoint == 0):
                 if rank == 0:
-                    create_dir('{}'.format(output_directory))
-                    create_dir('{}/{}'.format(output_directory, prj_name))
-                    create_dir('{}/{}/{}'.format(output_directory, prj_name, run_name))
                     checkpoint_path = "{}/{}/{}/waveglow_{}".format(
                         output_directory,
                         prj_name, run_name,
@@ -216,6 +214,13 @@ if __name__ == "__main__":
             wandb.init(name=args.run_name, project=args.prj_name, resume=args.resume)
         else:
             wandb.init(project=args.prj_name, resume=args.resume)
+
+    output_directory = train_config["output_directory"]
+    create_dir('{}'.format(output_directory))
+    create_dir('{}/{}'.format(output_directory, args.prj_name))
+    create_dir('{}/{}/{}'.format(output_directory, args.prj_name, args.run_name))
+    copyfile(args.config, '{}/{}/{}/{}'.format(
+        output_directory, args.prj_name, args.run_name, args.config))
 
     torch.backends.cudnn.enabled = True
     torch.backends.cudnn.benchmark = False
