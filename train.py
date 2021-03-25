@@ -29,6 +29,7 @@ import json
 import os
 import torch
 import wandb
+import math
 
 #=====START: ADDED FOR DISTRIBUTED======
 from distributed import init_distributed, apply_gradient_allreduce, reduce_tensor
@@ -74,9 +75,19 @@ def create_dir(dir_path):
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
 
+def get_clip_grad_norm(grad_norm, grad_clip_thresh):
+    clip_coef = grad_clip_thresh / (grad_norm + 1e-6)
+    if clip_coef < grad_clip_thresh:
+        clipped_grad_norm = grad_norm * clip_coef
+    else:
+        clipped_grad_norm = grad_norm
+
+    return clipped_grad_norm
+
 def train(num_gpus, rank, group_name, prj_name, run_name,
           output_directory, epochs, learning_rate,
           sigma, iters_per_checkpoint, batch_size, seed, fp16_run,
+          grad_clip_thresh,
           checkpoint_path, pretrained_path,
           with_tensorboard, with_wandb):
     torch.manual_seed(seed)
@@ -156,18 +167,34 @@ def train(num_gpus, rank, group_name, prj_name, run_name,
             else:
                 loss.backward()
 
+            is_overflow = False
+            if fp16_run:
+                grad_norm = torch.nn.utils.clip_grad_norm_(
+                    amp.master_params(optimizer), grad_clip_thresh)
+                is_overflow = math.isnan(grad_norm)
+                if not is_overflow:
+                    clipped_grad_norm = get_clip_grad_norm(grad_norm, grad_clip_thresh)
+            else:
+                grad_norm = torch.nn.utils.clip_grad_norm_(
+                    model.parameters(), grad_clip_thresh)
+                clipped_grad_norm = get_clip_grad_norm(grad_norm, grad_clip_thresh)
+
             optimizer.step()
 
             print("{}:\t{:.9f}".format(iteration, reduced_loss))
             if with_tensorboard and rank == 0:
                 logger.add_scalar('training_loss', reduced_loss, i + len(train_loader) * epoch)
 
-
             if with_wandb and rank == 0:
                 wandb.log({
                     'iteration': iteration,
                     'training_loss': reduced_loss,
                 }, step=iteration)
+                if not is_overflow:
+                    wandb.log({
+                        'grad_norm': grad_norm,
+                        'clipped_grad_norm': clipped_grad_norm,
+                    }, step=iteration)
 
             if (iteration % iters_per_checkpoint == 0):
                 if rank == 0:

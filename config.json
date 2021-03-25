@@ -8,6 +8,7 @@
         "iters_per_checkpoint": 1000,
         "batch_size": 8,
         "seed": 1234,
+        "grad_clip_thresh": 1.0,
         "checkpoint_path": "",
         "pretrained_path": "",
         "with_tensorboard": false,
