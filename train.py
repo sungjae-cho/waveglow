@@ -51,6 +51,15 @@ def load_checkpoint(checkpoint_path, model, optimizer):
           checkpoint_path, iteration))
     return model, optimizer, iteration
 
+def load_pretrained(pretrained_path, model):
+    assert os.path.isfile(pretrained_path)
+    pretrained_dict = torch.load(pretrained_path, map_location='cpu')
+    model_for_loading = pretrained_dict['model']
+    model.load_state_dict(model_for_loading.state_dict())
+    print("Loaded pretrained weights '{}'" .format(
+          pretrained_path))
+    return model
+
 def save_checkpoint(model, optimizer, learning_rate, iteration, filepath):
     print("Saving model and optimizer state at iteration {} to {}".format(
           iteration, filepath))
@@ -68,7 +77,8 @@ def create_dir(dir_path):
 def train(num_gpus, rank, group_name, prj_name, run_name,
           output_directory, epochs, learning_rate,
           sigma, iters_per_checkpoint, batch_size, seed, fp16_run,
-          checkpoint_path, with_tensorboard, with_wandb):
+          checkpoint_path, pretrained_path,
+          with_tensorboard, with_wandb):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     #=====START: ADDED FOR DISTRIBUTED======
@@ -96,6 +106,9 @@ def train(num_gpus, rank, group_name, prj_name, run_name,
         model, optimizer, iteration = load_checkpoint(checkpoint_path, model,
                                                       optimizer)
         iteration += 1  # next iteration is iteration + 1
+
+    if pretrained_path != "":
+        model = load_pretrained(pretrained_path, model)
 
     trainset = Mel2Samp(**data_config)
     # =====START: ADDED FOR DISTRIBUTED======
