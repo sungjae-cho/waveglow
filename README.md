@@ -1,3 +1,5 @@
+**[This README adapted to my modification of the WaveGlow implementation]**
+
 ![WaveGlow](waveglow_logo.png "WaveGLow")
 
 ## WaveGlow: a Flow-based Generative Network for Speech Synthesis
