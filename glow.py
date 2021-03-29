@@ -55,8 +55,15 @@ class WaveGlowLoss(torch.nn.Module):
                 log_s_total = log_s_total + torch.sum(log_s)
                 log_det_W_total += log_det_W_list[i]
 
-        loss = torch.sum(z*z)/(2*self.sigma*self.sigma) - log_s_total - log_det_W_total
-        return loss/(z.size(0)*z.size(1)*z.size(2))
+        loss_normalization = (z.size(0)*z.size(1)*z.size(2))
+
+        z_L2_normalized = torch.sum(z*z)/(2*self.sigma*self.sigma) / loss_normalization
+        neg_log_s_total = -log_s_total / loss_normalization
+        neg_log_det_W_total = -log_det_W_total / loss_normalization
+
+        loss = z_L2_normalized + neg_log_s_total + neg_log_det_W_total
+
+        return loss, (z_L2_normalized, neg_log_s_total, neg_log_det_W_total)
 
 
 class Invertible1x1Conv(torch.nn.Module):

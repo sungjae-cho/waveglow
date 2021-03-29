@@ -148,6 +148,8 @@ def train(num_gpus, rank, group_name, prj_name, run_name,
     for epoch in range(epoch_offset, epochs):
         print("Epoch: {}".format(epoch))
         for i, batch in enumerate(train_loader):
+            float_epoch = epoch + i / len(train_loader)
+
             model.zero_grad()
 
             mel, audio = batch
@@ -155,7 +157,8 @@ def train(num_gpus, rank, group_name, prj_name, run_name,
             audio = torch.autograd.Variable(audio.cuda())
             outputs = model((mel, audio))
 
-            loss = criterion(outputs)
+            loss, etc = criterion(outputs)
+            (z_L2_normalized, neg_log_s_total, neg_log_det_W_total) = etc
             if num_gpus > 1:
                 reduced_loss = reduce_tensor(loss.data, num_gpus).item()
             else:
@@ -188,7 +191,11 @@ def train(num_gpus, rank, group_name, prj_name, run_name,
             if with_wandb and rank == 0:
                 wandb.log({
                     'iteration': iteration,
+                    'epoch': float_epoch,
                     'training_loss': reduced_loss,
+                    'training_loss/z_L2_normalized': z_L2_normalized,
+                    'training_loss/neg_log_s_total': neg_log_s_total,
+                    'training_loss/neg_log_det_W_total': neg_log_det_W_total,
                 }, step=iteration)
                 if not is_overflow:
                     wandb.log({
