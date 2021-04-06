@@ -6,6 +6,7 @@
 
 ### Ryan Prenger, Rafael Valle, and Bryan Catanzaro
 
+```
 In our recent [paper], we propose WaveGlow: a flow-based network capable of
 generating high quality speech from mel-spectrograms. WaveGlow combines insights
 from [Glow] and [WaveNet] in order to provide fast, efficient and high-quality
@@ -19,13 +20,14 @@ kHz on an NVIDIA V100 GPU. Mean Opinion Scores show that it delivers audio
 quality as good as the best publicly available WaveNet implementation.
 
 Visit our [website] for audio samples.
+```
 
-## Setup
+## 1. Setup
 
 1. Clone our repo and initialize submodule
 
    ```command
-   git clone https://github.com/NVIDIA/waveglow.git
+   git clone https://github.com/sungjae-cho/waveglow.git
    cd waveglow
    git submodule init
    git submodule update
@@ -36,27 +38,62 @@ Visit our [website] for audio samples.
 3. Install [Apex]
 
 
-## Generate audio with our pre-existing model
+## 2. Generate audio with our pre-existing model
 
-1. Download our [published model]
-2. Download [mel-spectrograms]
-3. Generate audio `python3 inference.py -f <(ls mel_spectrograms/*.pt) -w waveglow_256channels.pt -o . --is_fp16 -s 0.6`  
+### 2.1. From the command line interface
+1. Download the [published model]. This is saved as  `pretrained/waveglow_256channels_universal_v5.pt`
+2. Download [mel-spectrograms]. These are saved in `mel_spectrograms`
+3. Generate audio `python3 inference.py -f <(ls mel_spectrograms/*.pt) -w pretrained/waveglow_256channels_universal_v5.pt -o mel_spectrograms. --is_fp16 -s 0.6`. Then, the command outputs are below.
+```
+mel_spectrograms/LJ001-0015.wav_synthesis.wav
+mel_spectrograms/LJ001-0051.wav_synthesis.wav
+mel_spectrograms/LJ001-0063.wav_synthesis.wav
+mel_spectrograms/LJ001-0072.wav_synthesis.wav
+mel_spectrograms/LJ001-0079.wav_synthesis.wav
+mel_spectrograms/LJ001-0094.wav_synthesis.wav
+mel_spectrograms/LJ001-0096.wav_synthesis.wav
+mel_spectrograms/LJ001-0102.wav_synthesis.wav
+mel_spectrograms/LJ001-0153.wav_synthesis.wav
+mel_spectrograms/LJ001-0173.wav_synthesis.wav
+```
 
 N.b. use `convert_model.py` to convert your older models to the current model
 with fused residual and skip connections.
 
-## Train your own model
+### 2.2. From the python script
 
-1. Download [LJ Speech Data]. In this example it's in `data/`
+```python
+import torch
+from scipy.io.wavfile import write
+from denoiser import Denoiser
 
-2. Make a list of the file names to use for training/testing
+sampling_rate = 22050
+audio_path = 'audio.wav'
+waveglow_path = new_args.init_waveglow
+waveglow = torch.load(waveglow_path)['model']
+for k, m in waveglow.named_modules():
+    m._non_persistent_buffers_set = set()  # pytorch 1.6.0 compatability
+waveglow = waveglow.remove_weightnorm(waveglow)
+waveglow.cuda().eval()
+wg_denoiser = Denoiser(waveglow).cuda()
+wg_denoiser_strength = 0.1 # Removes model bias. Start with 0.1 and adjust
+wg_sigma = 0.85
 
-   ```command
-   ls data/*.wav | tail -n+10 > train_files.txt
-   ls data/*.wav | head -n10 > test_files.txt
-   ```
+audio = wg_denoiser(waveglow.infer(mel_outputs_postnet, sigma=wg_sigma), wg_denoiser_strength)
 
-3. Train your WaveGlow networks
+audio = audio.squeeze().cpu().numpy()
+maxv = 2 ** (16 - 1)
+audio /= max(abs(audio.max()), abs(audio.min()))
+audio = (audio * maxv * 0.95).astype(np.int16)
+
+write(audio_path, sampling_rate, audio)
+```
+
+## 3. Train your own model
+
+1. Save a list of the file names for training into `train_files.txt` and for testing into `test_files.txt`.
+
+2. Train your WaveGlow networks
 
    ```command
    python train.py -c config.json --prj_name waveglow_ko --run_name test --visible_gpus 1
@@ -70,11 +107,11 @@ with fused residual and skip connections.
 
    For mixed precision training set `"fp16_run": true` on `config.json`.
 
-4. Make test set mel-spectrograms
+3. Make test set mel-spectrograms
 
    `python mel2samp.py -f test_files.txt -o . -c config.json`
 
-5. Do inference with your network
+4. Do inference with your network
 
    ```command
    ls *.pt > mel_files.txt
