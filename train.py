@@ -229,7 +229,7 @@ if __name__ == "__main__":
     parser.add_argument('--visible_gpus', type=str, default="0",
                         required=False, help='CUDA visible GPUs')
     parser.add_argument('--resume', type=str, default="",
-                        required=False, help='whether to resume wandb logging')
+                        required=False, help='wandb running ID')
     args = parser.parse_args()
 
     # Parse configs.  Globals nicer in this case
