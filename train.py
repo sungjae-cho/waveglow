@@ -148,7 +148,7 @@ def train(num_gpus, rank, group_name, prj_name, run_name,
     for epoch in range(epoch_offset, epochs):
         print("Epoch: {}".format(epoch))
         for i, batch in enumerate(train_loader):
-            float_epoch = epoch + i / len(train_loader)
+            float_epoch = float(iteration) / len(train_loader)
 
             model.zero_grad()
 
