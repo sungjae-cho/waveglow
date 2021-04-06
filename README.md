@@ -91,12 +91,14 @@ write(audio_path, sampling_rate, audio)
 
 ## 3. Train your own model
 
+### 3.1. Train your own model
+
 1. Save a list of the file names for training into `train_files.txt` and for testing into `test_files.txt`.
 
-2. Train your WaveGlow networks
+3. Train your WaveGlow networks
 
    ```command
-   python train.py -c config.json --prj_name waveglow_ko --run_name test --visible_gpus 1
+   python train.py -c config.json --prj_name prj_name --run_name run_name --visible_gpus 1
    ```
 
    For multi-GPU training replace `train.py` with `distributed.py`.  Only tested with single node and NCCL.
@@ -107,15 +109,17 @@ write(audio_path, sampling_rate, audio)
 
    For mixed precision training set `"fp16_run": true` on `config.json`.
 
-3. Make test set mel-spectrograms
+### 3.2. Test your own model
+
+1. Make test set mel-spectrograms
 
    `python mel2samp.py -f test_files.txt -o . -c config.json`
 
-4. Do inference with your network
+2. Do inference with your network at iteration 10000 of the  `checkpoints/prj_name/run_name/waveglow_10000` checkpoint.
 
    ```command
    ls *.pt > mel_files.txt
-   python3 inference.py -f mel_files.txt -w checkpoints/waveglow_10000 -o . --is_fp16 -s 0.6
+   python3 inference.py -f mel_files.txt -w checkpoints/prj_name/run_name/waveglow_10000 -o . --is_fp16 -s 0.6
    ```
 
 [//]: # (TODO)
