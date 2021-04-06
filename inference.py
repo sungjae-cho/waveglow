@@ -35,6 +35,8 @@ def main(mel_files, waveglow_path, sigma, output_dir, sampling_rate, is_fp16,
          denoiser_strength):
     mel_files = files_to_list(mel_files)
     waveglow = torch.load(waveglow_path)['model']
+    for k, m in waveglow.named_modules():
+        m._non_persistent_buffers_set = set()  # pytorch 1.6.0 compatability
     waveglow = waveglow.remove_weightnorm(waveglow)
     waveglow.cuda().eval()
     if is_fp16:
