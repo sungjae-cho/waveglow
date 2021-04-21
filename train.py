@@ -30,6 +30,7 @@ import os
 import torch
 import wandb
 import math
+import time
 
 #=====START: ADDED FOR DISTRIBUTED======
 from distributed import init_distributed, apply_gradient_allreduce, reduce_tensor
@@ -153,6 +154,8 @@ def train(num_gpus, rank, group_name, prj_name, run_name,
     for epoch in range(epoch_offset, epochs):
         print("Epoch: {}".format(epoch))
         for i, batch in enumerate(train_loader):
+            iter_start = time.perf_counter()
+
             float_epoch = float(iteration) / len(train_loader)
 
             model.zero_grad()
@@ -188,6 +191,7 @@ def train(num_gpus, rank, group_name, prj_name, run_name,
                 clipped_grad_norm = get_clip_grad_norm(grad_norm, grad_clip_thresh)
 
             optimizer.step()
+            iter_duration = time.perf_counter() - iter_start
 
             print("{}:\t{:.9f}".format(iteration, reduced_loss))
             if with_tensorboard and rank == 0:
@@ -197,6 +201,7 @@ def train(num_gpus, rank, group_name, prj_name, run_name,
                 wandb.log({
                     'iteration': iteration,
                     'epoch': float_epoch,
+                    'iter_duration': iter_duration,
                     'training_loss': reduced_loss,
                     'training_loss/z_L2_normalized': z_L2_normalized,
                     'training_loss/neg_log_s_total': neg_log_s_total,
