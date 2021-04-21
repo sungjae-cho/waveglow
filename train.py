@@ -123,9 +123,14 @@ def train(num_gpus, rank, group_name, prj_name, run_name,
 
     trainset = Mel2Samp(**data_config)
     # =====START: ADDED FOR DISTRIBUTED======
-    train_sampler = DistributedSampler(trainset) if num_gpus > 1 else None
+    if num_gpus > 1:
+        train_sampler = DistributedSampler(trainset)
+        shuffle_at_dataloader = False
+    else:
+        train_sampler = None
+        shuffle_at_dataloader = True
     # =====END:   ADDED FOR DISTRIBUTED======
-    train_loader = DataLoader(trainset, num_workers=1, shuffle=False,
+    train_loader = DataLoader(trainset, num_workers=1, shuffle=shuffle_at_dataloader,
                               sampler=train_sampler,
                               batch_size=batch_size,
                               pin_memory=False,
