@@ -276,8 +276,10 @@ if __name__ == "__main__":
     create_dir('{}'.format(output_directory))
     create_dir('{}/{}'.format(output_directory, args.prj_name))
     create_dir('{}/{}/{}'.format(output_directory, args.prj_name, args.run_name))
-    copyfile(args.config, '{}/{}/{}/{}'.format(
-        output_directory, args.prj_name, args.run_name, args.config))
+    new_config_path = '{}/{}/{}/{}'.format(
+        output_directory, args.prj_name, args.run_name, os.path.split(args.config)[1])
+    if args.config != new_config_path:
+        copyfile(args.config, new_config_path)
 
     torch.backends.cudnn.enabled = True
     torch.backends.cudnn.benchmark = False
