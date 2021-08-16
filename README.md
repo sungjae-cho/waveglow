@@ -69,18 +69,19 @@ from denoiser import Denoiser
 
 sampling_rate = 22050
 audio_path = 'audio.wav'
-waveglow_path = new_args.init_waveglow
+waveglow_path = 'pretrained/waveglow_256channels_universal_v5.pt'
 waveglow = torch.load(waveglow_path)['model']
 for k, m in waveglow.named_modules():
     m._non_persistent_buffers_set = set()  # pytorch 1.6.0 compatability
 waveglow = waveglow.remove_weightnorm(waveglow)
 waveglow.cuda().eval()
 wg_denoiser = Denoiser(waveglow).cuda()
-wg_denoiser_strength = 0.1 # Removes model bias. Start with 0.1 and adjust
-wg_sigma = 0.85
+wg_denoiser_strength = 0.1 # Removes model bias. Start with 0.1 and adjust. Max 1.0.
+wg_sigma = 0.6 # default value in the official paper
 
 audio = wg_denoiser(waveglow.infer(mel_outputs_postnet, sigma=wg_sigma), wg_denoiser_strength)
 
+# audio normalization
 audio = audio.squeeze().cpu().numpy()
 maxv = 2 ** (16 - 1)
 audio /= max(abs(audio.max()), abs(audio.min()))
@@ -107,19 +108,22 @@ write(audio_path, sampling_rate, audio)
    python distributed.py -c config.json --prj_name prj_name --run_name run_name --visible_gpus 1,2,3
    ```
 
-   For mixed precision training set `"fp16_run": true` on `config.json`.
+   For mixed precision training set `"fp16_run": true` on `config.json`. To use this, `apex` must be installed.
 
 ### 3.2. Test your own model
 
 1. Make test set mel-spectrograms
 
-   `python mel2samp.py -f test_files.txt -o . -c config.json`
+   ```command
+   mkdir test_out_dir
+   python mel2samp.py -f test_files.txt -o test_out_dir -c config.json
+   ```
 
 2. Do inference with your network at iteration 10000 of the  `checkpoints/prj_name/run_name/waveglow_10000` checkpoint.
 
    ```command
-   ls *.pt > mel_files.txt
-   python3 inference.py -f mel_files.txt -w checkpoints/prj_name/run_name/waveglow_10000 -o . --is_fp16 -s 0.6
+   ls test_files/*.pt > file_lists/mel_files.txt
+   python3 inference.py -f file_lists/mel_files.txt -w checkpoints/prj_name/run_name/waveglow_10000 -o test_out_dir --is_fp16 -s 0.6
    ```
 
 [//]: # (TODO)
